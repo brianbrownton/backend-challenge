@@ -9,43 +9,56 @@ class EverlywellApi extends Controller
 
     public function test(): JsonResponse
     {
-        return response()->json(['hi'=>'there']);
+        return response()->json(['hi' => 'there']);
     }
 
-    public function allAvailable(int $regionId): JsonResponse
+    public function AddMember(): JsonResponse
     {
-        $query = "{$this->selectRows} {$this->baseQuery} LIMIT {$this->page}, " . self::QUERY_LIMIT;
-        $available = Cache::remember(
-            $this->buildCacheKey([$query, $regionId]),
-            self::TTL,
-            function () use ($regionId, $query) {
-                $regionDb = $this->db[$regionId];
-                $stmt = $regionDb->prepare($query);
-                $stmt->execute();
+        $name = $this->request->input('name');
+        $wUrl = $this->request->input('websiteUrl');
 
-                $data = $stmt->fetchAll();
+        //validate inputs
+        if (
+            !$name ||
+            !$wUrl ||
+            str_starts_with($wUrl, 'http') === false
+        ) {
+            return response()->json(['error' => 'invalid member inputs']);
+        }
 
-                return array_map(function ($row) use ($regionId) {
-                    return array_merge($row, $this->regions[$regionId]);
-                }, $data);
-            }
-        );
+        //shorten url
+        $wUrlShort = $this->ShortenUrl($wUrl);
 
-        $countQuery = "{$this->selectCount} {$this->baseQuery}";
-        $availableCount = Cache::remember(
-            $this->buildCacheKey([$countQuery, $regionId]),
-            self::TTL,
-            function () use ($regionId, $countQuery) {
-                $regionDb = $this->db[$regionId];
-                $stmt = $regionDb->prepare($countQuery);
-                $stmt->execute();
+        $stmt = $this->db->prepare("
+            insert into Members (Name, WebsiteUrl, WebsiteUrlShortened) values (?,?,?)
+        ");
+        $stmt->execute([$name, $wUrl, $wUrlShort]);
+        return response()->json($this->db->lastInsertId());
+    }
 
-                $data = $stmt->fetch();
+    public function ViewMember(): JsonResponse
+    {
+        return response()->json([]);
+    }
 
-                return $data['rowCount'];
-            }
-        );
+    public function ListMembers(): JsonResponse
+    {
+        return response()->json([]);
+    }
 
-        return response()->json(new ApiResponse($available, 200, $availableCount, self::QUERY_LIMIT));
+    private function ShortenUrl($url): string
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://git.io');
+//        curl_setopt($ch, CURLOPT_POST, count($params));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, "url={$url}");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $result = curl_exec($ch);
+        if ($result === false) {
+            exit('Curl error: ' . curl_error($ch));
+        }
+        curl_close($ch);
+
+        return $result;
     }
 }

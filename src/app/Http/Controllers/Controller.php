@@ -10,12 +10,14 @@ use PDO;
 class Controller extends BaseController
 {
     protected $db;
+    protected $request;
 
     /**
      * Controller constructor.
      */
     public function __construct(Request $request)
     {
+        $this->request = $request;
         try {
             $this->db = new PDO(
                 'mysql:host=' . env('DB_HOST') . ';dbname=' . env('DB_DB'),
@@ -31,10 +33,5 @@ class Controller extends BaseController
         catch (\Exception $e) {
             echo "error connecting to everlywell db";
         }
-    }
-
-    protected function buildCacheKey(array $args): string
-    {
-        return hash('sha256', json_encode($args));
     }
 }

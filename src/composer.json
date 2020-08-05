@@ -8,7 +8,8 @@
         "php": "^7.4",
         "ext-pdo": "*",
         "ext-json": "*",
-        "laravel/lumen-framework": "^7.0"
+        "laravel/lumen-framework": "^7.0",
+        "ext-curl": "*"
     },
     "require-dev": {
         "fzaninotto/faker": "^1.9.1",

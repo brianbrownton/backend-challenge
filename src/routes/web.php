@@ -19,3 +19,4 @@ $router->get('/', function () use ($router) {
 });
 
 $router->get('/test', ['uses' => 'EverlywellApi@test']);
+$router->post('/addMember', ['uses' => 'EverlywellApi@AddMember']);
