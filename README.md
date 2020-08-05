@@ -1,51 +1,46 @@
 # EverlyWell Backend Challenge
 
-### Overview
+### Requirements
+- a recent version of docker
+- docker-compose (supporting at least api version 3)
 
-Using a language and framework of your choice, we'd like you to create a simple experts directory search tool. The tool can either be a full featured application or API only.
+### Init
+- clone repo
 
-* Spend no more than 4 hours coding for the project. Do not include any initial application setup in this time limit.
+#### install packages/dependencies
+- `$ cd backend-challenge/src`
+- 
+    ```
+    $ docker run --rm \
+       -v $PWD:/app \
+       -v ${COMPOSER_HOME:-$HOME/.composer}:/tmp \
+       -u "$(id -u):$(id -g)" \
+       composer install
+    ```
+#### bring up the environment
+- `$ cd backend-challenge/docker`
+- `$ docker-compose up`
+- verify app is running at http://localhost
 
-### Requirements:
+### Usage
 
-The application should fulfill the following requirements:
+### Tests
+We can use the existing php docker container to run the tests by using the following genericized command:
+```
+$docker exec -it <container_id_or_name> /var/www/api/vendor/bin/phpunit -c /var/www/api/phpunit.xml
+```
+Find the docker container ID for php:
+```
+$ docker ps
+CONTAINER ID        IMAGE                    COMMAND                  CREATED             STATUS              PORTS                               NAMES
+6d25436a0d22        nginx:mainline-alpine    "nginx -g 'daemon of…"   5 minutes ago       Up 5 minutes        0.0.0.0:80->80/tcp                  docker_everlywell_nginx_1
+1c3b9ff7f8d6        docker_everlywell_php7   "docker-php-entrypoi…"   5 minutes ago       Up 5 minutes        0.0.0.0:9000->9000/tcp              docker_everlywell_php7_1
+4086b6e01f8e        docker_everlywell_db     "docker-entrypoint.s…"   5 minutes ago       Up 5 minutes        0.0.0.0:3306->3306/tcp, 33060/tcp   docker_everlywell_db_1
+```
 
-* A member can be created using their name and a personal website address.
-* When a member is created, all the heading (h1-h3) values are pulled in from the website to that members profile.
-* The website url is shortened (e.g. using http://goo.gl).
-* After the member has been added, I can define their friendships with other existing members. Friendships are bi-directional i.e. If David is a friend of Oliver, Oliver is always a friend of David as well.
-* The interface should list all members with their name, short url and the number of friends.
-* Viewing an actual member should display the name, website URL, shortening, website headings, and links to their friends' pages.
-* Now, looking at Alan's profile, I want to find experts in the application who write about a certain topic and are not already friends of Alan.
-* Results should show the path of introduction from Alan to the expert e.g. Alan wants to get introduced to someone who writes about 'Dog breeding'. Claudia's website has a heading tag "Dog breeding in Ukraine". Bart knows Alan and Claudia. An example search result would be Alan -> Bart -> Claudia ("Dog breeding in Ukraine").
+In the above sample output it is `1c3b9ff7f8d6`.
 
-We encourage the use of any libraries for everything except the search functionality, in which we want to see your simple algorithm approach.
-
-### Add-ons:
-
-* Sign up/log in functionality
-* A UI that expands upon the basic requirements to have a user-friendly look and feel
-* Anything else you, as a user, would enjoy seeing in an interface like this
-
-### Things we're looking for:
-
-* Navigable code
-* Efficient algorithms
-* Good separation of concerns
-* Error handling
-* Usage of gems/libraries
-
-### Things we like:
-
-* Well commented & well organized code
-* Quality over quantity (the code you write should be good) 
-* Small, meaningful, commits
-* Tests!
-* Respect for the time limit - if you are in the midst of some work that you would like to finish, but have hit the 4 hour time limit, please split additional work into a separate branch, to be evaluated separately
-
-### Submission
-
-* __Fork__ this repository to your own git
-* Remember to make meaningful commits as you work
-* Somehow share your repository with us
-* __Important:__ If there are credentials required (.env or master.key file), please email these to us directly or we can’t review your project
+Thus, the command to run the actual tests is
+```
+docker exec -it 1c3b9ff7f8d6 /var/www/api/vendor/bin/phpunit -c /var/www/api/phpunit.xml
+```

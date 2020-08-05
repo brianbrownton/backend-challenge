@@ -1,0 +1,30 @@
+version: "3"
+services:
+    everlywell_db:
+        build: ./mysql
+        ports:
+            - 3306:3306
+        restart: always
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+        volumes:
+            - ./mysql/data:/var/lib/mysql
+            - ./mysql/init:/docker-entrypoint-initdb.d
+
+    everlywell_php7:
+        build: ./php7
+        ports:
+            - 9000:9000
+        depends_on:
+            - everlywell_db
+        volumes:
+            - ../src:/var/www/api
+
+    everlywell_nginx:
+        image: nginx:mainline-alpine
+        ports:
+            - 80:80
+        depends_on:
+            - everlywell_php7
+        volumes:
+            - ./nginx/conf.d:/etc/nginx/conf.d:ro
