@@ -44,3 +44,7 @@ Thus, the command to run the actual tests is
 ```
 docker exec -it 1c3b9ff7f8d6 /var/www/api/vendor/bin/phpunit -c /var/www/api/phpunit.xml
 ```
+
+### Todo
+- write tests
+- update env with schema/seed

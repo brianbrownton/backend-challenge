@@ -20,6 +20,7 @@ $router->get('/', function () use ($router) {
 
 $router->get('/test', ['uses' => 'EverlywellApi@test']);
 $router->get('/listMembers', ['uses' => 'EverlywellApi@ListMembers']);
-$router->post('/addMember', ['uses' => 'EverlywellApi@AddMember']);
 $router->get('/viewMember/{memberId}', ['uses' => 'EverlywellApi@ViewMember']);
+$router->post('/addMember', ['uses' => 'EverlywellApi@AddMember']);
 $router->post('/createFriendship/{mIdOne}/{mIdTwo}', ['uses' => 'EverlywellApi@CreateFriendship']);
+$router->post('/search', ['uses' => 'EverlywellApi@Search']);

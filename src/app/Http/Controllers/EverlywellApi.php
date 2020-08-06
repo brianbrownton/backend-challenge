@@ -51,7 +51,7 @@ class EverlywellApi extends Controller
         $memberId = $this->db->lastInsertId();
 
         //scrape
-        if(!$this->Scrape($wUrl, $memberId)){
+        if (!$this->Scrape($wUrl, $memberId)) {
             return response()->json([
                 'success' => false,
                 'error' => "could not scrape headings from {$wUrl}"
@@ -67,16 +67,39 @@ class EverlywellApi extends Controller
 
     public function ViewMember(int $memberId): JsonResponse
     {
-        //Viewing an actual member should display the name, website URL, shortening, website headings,
-        //and links to their friends' pages.
-
         //get info and headings
         $memberInfo = $this->GetMemberInfo($memberId);
 
         //get friends
         $memberFriends = $this->GetMemberFriends($memberId);
 
-        return response()->json([]);
+        $output = [
+            'name' => $memberInfo[0]['Name'],
+            'websiteUrl' => $memberInfo[0]['WebsiteUrl'],
+            'websiteUrlShort' => $memberInfo[0]['WebsiteUrlShortened'],
+            'headings' => [],
+            'friends' => []
+        ];
+
+        //hydrate headings (if there are any)
+        if ($memberInfo[0]['Heading']) {
+            foreach ($memberInfo as $datum) {
+                $output['headings'][] = [
+                    'type' => $datum['HeadingType'],
+                    'text' => $datum['Heading']
+                ];
+            }
+        }
+
+        //hydrate friends
+        foreach ($memberFriends as $friend) {
+            $output['friends'][] = [
+                'name' => $friend['FriendName'],
+                'link' => '/viewMember/' . $friend['FriendId']
+            ];
+        }
+
+        return response()->json($output);
     }
 
 
@@ -101,6 +124,9 @@ class EverlywellApi extends Controller
 
     public function CreateFriendship(int $mIdOne, int $mIdTwo): JsonResponse
     {
+        //we are using url parameters instead of post body here to save time
+        // - parameters get builtin type checking
+
         //make sure members exist and are distinct
         $stmt = $this->db->prepare("
             select MemberId from Members where MemberId in (?,?)
@@ -122,6 +148,45 @@ class EverlywellApi extends Controller
         $stmt->execute([$mIdOne, $mIdTwo, $mIdTwo, $mIdOne]);
 
         return response()->json(['success' => true]);
+    }
+
+
+    public function Search(): JsonResponse
+    {
+        $term = $this->request->input('term');
+        $mRef = $this->request->input('memberReference');
+
+        //validate inputs
+        if (!$term || !$mRef) {
+            return response()->json([
+                'success' => false,
+                'error' => 'a search term and member reference are required'
+            ]);
+        }
+
+        $stmt = $this->db->prepare("
+            select
+                mf2.FirstMemberId as FirstDegreeFriend,
+                mf2.SecondMemberId as SecondDegreeFriend,
+                mh.HeadingType,
+                mh.Heading
+            from MemberFriends mf
+            left join MemberFriends mf2 on mf.SecondMemberId = mf2.FirstMemberId
+            left join MemberHeadings mh on mf2.SecondMemberId = mh.MemberId
+            where mf.FirstMemberId = ?
+                and mf2.SecondMemberId != ?
+                and mh.Heading like ?
+        ");
+        //the double wildcard on the like will ruin performance because an index can't be used
+        //due to the wildcard before the term, but for demo purposes it is fine
+        $stmt->execute([$mRef, $mRef, "%{$term}%"]);
+
+        $output = [
+            'success' => true,
+            'results' => $stmt->fetchAll()
+        ];
+
+        return response()->json($output);
     }
 
 
@@ -160,11 +225,11 @@ class EverlywellApi extends Controller
          * todo: bulk insert instead of looping
          */
         $hasFailure = false;
-        foreach ($headers as $header){
+        foreach ($headers as $header) {
             $stmt = $this->db->prepare("
                 insert into MemberHeadings (MemberId, HeadingType, Heading) values (?,?,?)
             ");
-            if (!$stmt->execute([$memberId, $header['type'], $header['content']])){
+            if (!$stmt->execute([$memberId, $header['type'], $header['content']])) {
                 $hasFailure = true;
             }
         }
@@ -177,7 +242,9 @@ class EverlywellApi extends Controller
     {
         $stmt = $this->db->prepare("
             select
-            *
+                m.*,
+                mh.HeadingType,
+                mh.Heading
             from Members m
             left join MemberHeadings mh on m.MemberId = mh.MemberId
             where m.MemberId = ?
@@ -192,9 +259,11 @@ class EverlywellApi extends Controller
     {
         $stmt = $this->db->prepare("
             select
-                mf.SecondMemberId as FriendId
+                mf.SecondMemberId as FriendId,
+                m2.Name as FriendName
             from Members m
             join MemberFriends mf on m.MemberId = mf.FirstMemberId
+            join Members m2 on mf.SecondMemberId = m2.MemberId
             where m.MemberId = ?
         ");
         $stmt->execute([$memberId]);
