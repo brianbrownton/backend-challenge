@@ -3,6 +3,7 @@
 ### Requirements
 - a recent version of docker
 - docker-compose (supporting at least api version 3)
+- something to test API endpoints with like [Postman](https://www.postman.com/)
 
 #
 
