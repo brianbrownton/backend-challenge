@@ -15,6 +15,7 @@ class EverlywellApi extends Controller
         return response()->json(['hi' => 'there']);
     }
 
+
     public function AddMember(): JsonResponse
     {
         $name = $this->request->input('name');
@@ -47,24 +48,37 @@ class EverlywellApi extends Controller
         ");
         $stmt->execute([$name, $wUrl, $wUrlShort]);
 
+        $memberId = $this->db->lastInsertId();
+
         //scrape
-        if(!$this->Scrape($wUrl)){
+        if(!$this->Scrape($wUrl, $memberId)){
             return response()->json([
                 'success' => false,
                 'error' => "could not scrape headings from {$wUrl}"
             ]);
         }
 
-
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'memberId' => $memberId
+        ]);
     }
 
-    public function ViewMember(): JsonResponse
+
+    public function ViewMember(int $memberId): JsonResponse
     {
         //Viewing an actual member should display the name, website URL, shortening, website headings,
         //and links to their friends' pages.
+
+        //get info and headings
+        $memberInfo = $this->GetMemberInfo($memberId);
+
+        //get friends
+        $memberFriends = $this->GetMemberFriends($memberId);
+
         return response()->json([]);
     }
+
 
     public function ListMembers(): JsonResponse
     {
@@ -83,6 +97,7 @@ class EverlywellApi extends Controller
 
         return response()->json($stmt->fetchAll());
     }
+
 
     public function CreateFriendship(int $mIdOne, int $mIdTwo): JsonResponse
     {
@@ -109,7 +124,8 @@ class EverlywellApi extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function ShortenUrl($url): string
+
+    private function ShortenUrl(string $url): string
     {
         $api = new BitlyApi(env('BITLY_API_KEY'));
         $bitlink = new Bitlink($api);
@@ -121,13 +137,68 @@ class EverlywellApi extends Controller
             : '';
     }
 
-    private function Scrape($url): bool
+    private function Scrape(string $url, int $memberId): bool
     {
         $client = new Scraper();
         $crawler = $client->request('GET', $url);
-        $crawler->filter('h1')->each(function ($node) {
-            print $node->nodeName()."\n";
-            print $node->text()."\n";
+
+        $headers = [];
+        $crawler->filter('h1,h2,h3')->each(function ($node) use (&$headers) {
+            $headers[] = [
+                'type' => $node->nodeName(),
+                'content' => $node->text()
+            ];
         });
+
+        return $this->PersistHeaders($headers, $memberId);
+    }
+
+
+    private function PersistHeaders(array $headers, int $memberId): bool
+    {
+        /*
+         * todo: bulk insert instead of looping
+         */
+        $hasFailure = false;
+        foreach ($headers as $header){
+            $stmt = $this->db->prepare("
+                insert into MemberHeadings (MemberId, HeadingType, Heading) values (?,?,?)
+            ");
+            if (!$stmt->execute([$memberId, $header['type'], $header['content']])){
+                $hasFailure = true;
+            }
+        }
+
+        return !$hasFailure;
+    }
+
+
+    private function GetMemberInfo(int $memberId): array
+    {
+        $stmt = $this->db->prepare("
+            select
+            *
+            from Members m
+            left join MemberHeadings mh on m.MemberId = mh.MemberId
+            where m.MemberId = ?
+        ");
+        $stmt->execute([$memberId]);
+
+        return $stmt->fetchAll();
+    }
+
+
+    private function GetMemberFriends(int $memberId): array
+    {
+        $stmt = $this->db->prepare("
+            select
+                mf.SecondMemberId as FriendId
+            from Members m
+            join MemberFriends mf on m.MemberId = mf.FirstMemberId
+            where m.MemberId = ?
+        ");
+        $stmt->execute([$memberId]);
+
+        return $stmt->fetchAll();
     }
 }
