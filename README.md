@@ -47,4 +47,3 @@ docker exec -it 1c3b9ff7f8d6 /var/www/api/vendor/bin/phpunit -c /var/www/api/php
 
 ### Todo
 - write tests
-- update env with schema/seed
