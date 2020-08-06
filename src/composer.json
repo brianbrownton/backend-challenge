@@ -6,10 +6,12 @@
     "type": "project",
     "require": {
         "php": "^7.4",
-        "ext-pdo": "*",
+        "ext-curl": "*",
         "ext-json": "*",
+        "ext-pdo": "*",
+        "fabpot/goutte": "^4.0",
         "laravel/lumen-framework": "^7.0",
-        "ext-curl": "*"
+        "phplicengine/bitly": "^1.0"
     },
     "require-dev": {
         "fzaninotto/faker": "^1.9.1",

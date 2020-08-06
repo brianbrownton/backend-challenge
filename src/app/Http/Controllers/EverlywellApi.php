@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use PHPLicengine\Api\Api as BitlyApi;
+use PHPLicengine\Service\Bitlink;
+use Goutte\Client as Scraper;
 
 class EverlywellApi extends Controller
 {
@@ -23,42 +26,108 @@ class EverlywellApi extends Controller
             !$wUrl ||
             str_starts_with($wUrl, 'http') === false
         ) {
-            return response()->json(['error' => 'invalid member inputs']);
+            return response()->json([
+                'success' => false,
+                'error' => 'invalid member inputs'
+            ]);
         }
 
         //shorten url
         $wUrlShort = $this->ShortenUrl($wUrl);
+        if (!$wUrlShort) {
+            return response()->json([
+                'success' => false,
+                'error' => "bitly cannot shorten that url ({$wUrl})"
+            ]);
+        }
 
+        //persist
         $stmt = $this->db->prepare("
             insert into Members (Name, WebsiteUrl, WebsiteUrlShortened) values (?,?,?)
         ");
         $stmt->execute([$name, $wUrl, $wUrlShort]);
-        return response()->json($this->db->lastInsertId());
+
+        //scrape
+        if(!$this->Scrape($wUrl)){
+            return response()->json([
+                'success' => false,
+                'error' => "could not scrape headings from {$wUrl}"
+            ]);
+        }
+
+
+        return response()->json(['success' => true]);
     }
 
     public function ViewMember(): JsonResponse
     {
+        //Viewing an actual member should display the name, website URL, shortening, website headings,
+        //and links to their friends' pages.
         return response()->json([]);
     }
 
     public function ListMembers(): JsonResponse
     {
-        return response()->json([]);
+        //get data
+        $stmt = $this->db->prepare("
+            select
+                MemberId,
+                Name,
+                WebsiteUrlShortened,
+                count(mf.FirstMemberId) as Friends
+            from Members m
+            left join MemberFriends mf on m.MemberId = mf.FirstMemberId
+            group by MemberId
+        ");
+        $stmt->execute();
+
+        return response()->json($stmt->fetchAll());
+    }
+
+    public function CreateFriendship(int $mIdOne, int $mIdTwo): JsonResponse
+    {
+        //make sure members exist and are distinct
+        $stmt = $this->db->prepare("
+            select MemberId from Members where MemberId in (?,?)
+        ");
+        $stmt->execute([$mIdOne, $mIdTwo]);
+        $results = $stmt->fetchAll();
+
+        if (count($results) !== 2) {
+            return response()->json([
+                'success' => false,
+                'error' => 'please use two distinct member ids'
+            ]);
+        }
+
+        //persist friendship twice for easier retrieval
+        $stmt = $this->db->prepare("
+            insert into MemberFriends (FirstMemberId, SecondMemberId) values (?,?),(?,?)
+        ");
+        $stmt->execute([$mIdOne, $mIdTwo, $mIdTwo, $mIdOne]);
+
+        return response()->json(['success' => true]);
     }
 
     private function ShortenUrl($url): string
     {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'https://git.io');
-//        curl_setopt($ch, CURLOPT_POST, count($params));
-        curl_setopt($ch, CURLOPT_POSTFIELDS, "url={$url}");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $result = curl_exec($ch);
-        if ($result === false) {
-            exit('Curl error: ' . curl_error($ch));
-        }
-        curl_close($ch);
+        $api = new BitlyApi(env('BITLY_API_KEY'));
+        $bitlink = new Bitlink($api);
+        $result = $bitlink->createBitlink(['long_url' => $url]);
 
-        return $result;
+        $responseArray = $result->getResponseArray();
+        return array_key_exists('link', $responseArray)
+            ? $responseArray['link']
+            : '';
+    }
+
+    private function Scrape($url): bool
+    {
+        $client = new Scraper();
+        $crawler = $client->request('GET', $url);
+        $crawler->filter('h1')->each(function ($node) {
+            print $node->nodeName()."\n";
+            print $node->text()."\n";
+        });
     }
 }
